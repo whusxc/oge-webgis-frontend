@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="40" cy="40" r="38" fill="#409EFF" stroke="#fff" stroke-width="2"/>
+  
+  <!-- 地球图形 -->
+  <circle cx="40" cy="40" r="30" fill="#67C23A" opacity="0.8"/>
+  
+  <!-- 网格线 -->
+  <path d="M40 10 L40 70 M15 25 L65 25 M15 55 L65 55 M25 15 Q40 30 55 15 M25 65 Q40 50 55 65" 
+        stroke="#fff" stroke-width="1.5" fill="none" opacity="0.9"/>
+  
+  <!-- 文字 OGE -->
+  <text x="40" y="48" font-family="Arial, sans-serif" font-size="14" font-weight="bold" 
+        text-anchor="middle" fill="white">
+    OGE
+  </text>
+</svg> 

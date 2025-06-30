@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/oge-logo.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OGE-GA+ | 智能地理分析平台</title>
+  <meta name="description" content="基于OGE和MCP的智能地理分析平台，支持坡度分析、缓冲区分析、AI智能助手等功能" />
+  
+  <!-- Mapbox GL CSS -->
+  <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+  
+  <!-- Element Plus 图标字体 -->
+  <link rel="stylesheet" href="//unpkg.com/element-plus/dist/index.css" />
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    #app {
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    /* Mapbox 地图容器样式 */
+    .mapboxgl-map {
+      outline: none;
+    }
+    
+    .mapboxgl-ctrl-bottom-left,
+    .mapboxgl-ctrl-bottom-right {
+      display: none;
+    }
+    
+    /* 加载动画 */
+    .loading-spinner {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+    }
+    
+    .loading-spinner .el-loading-mask {
+      background-color: rgba(255, 255, 255, 0.9);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading-spinner" id="initial-loading">
+      <div style="text-align: center; color: #409EFF;">
+        <div style="font-size: 18px; margin-bottom: 10px;">🌍 OGE-GA+</div>
+        <div style="font-size: 14px;">正在加载智能地理分析平台...</div>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="/src/main.js"></script>
+  
+  <script>
+    // 移除初始加载动画
+    window.addEventListener('load', function() {
+      setTimeout(() => {
+        const loading = document.getElementById('initial-loading');
+        if (loading) {
+          loading.style.opacity = '0';
+          setTimeout(() => loading.remove(), 300);
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html> 
