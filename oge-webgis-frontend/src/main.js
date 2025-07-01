@@ -45,7 +45,7 @@ app.config.errorHandler = (err, vm, info) => {
 
 // 开发环境配置
 if (import.meta.env.DEV) {
-  console.log('🌍 OGE-GA+ 开发模式启动')
+  console.log('🌍 OGE 开发模式启动')
   console.log('📍 地图服务: Mapbox GL JS')
   console.log('🔧 MCP服务: localhost:8000')
   console.log('🤖 智能助手: 已集成')

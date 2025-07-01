@@ -24,19 +24,19 @@ export default defineConfig({
   server: {
     port: 3000,
     host: '0.0.0.0',
-    // 注释掉代理配置，支持离线模式运行
-    // proxy: {
-    //   '/api/mcp': {
-    //     target: 'http://localhost:8000',  // MCP服务器地址（需要内网）
-    //     changeOrigin: true,
-    //     rewrite: (path) => path.replace(/^\/api\/mcp/, '')
-    //   },
-    //   '/api/oge': {
-    //     target: 'http://10.101.240.20',  // OGE后端地址（需要内网）
-    //     changeOrigin: true,
-    //     rewrite: (path) => path.replace(/^\/api\/oge/, '')
-    //   }
-    // }
+    // 更新代理配置，连接可用的OGE服务器
+    proxy: {
+      '/api/mcp': {
+        target: 'http://localhost:8000',  // 本地MCP服务器地址
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/mcp/, '')
+      },
+              '/api/oge': {
+          target: 'http://111.37.195.111:7002',  // 志威哥提供的外网穿透地址
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/oge/, '')
+        }
+    }
   },
   build: {
     outDir: 'dist',

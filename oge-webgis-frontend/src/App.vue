@@ -1,5 +1,5 @@
 <template>
-  <div id="app" class="oge-gaplus-app">
+  <div id="app" class="oge-app">
     <router-view />
   </div>
 </template>
@@ -17,7 +17,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss">
-.oge-gaplus-app {
+.oge-app {
   height: 100vh;
   width: 100vw;
   overflow: hidden;

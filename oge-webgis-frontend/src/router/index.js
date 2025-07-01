@@ -11,7 +11,7 @@ const routes = [
     name: 'MapView',
     component: () => import('@/views/MapView.vue'),
     meta: {
-      title: 'OGE-GA+ | 智能地理分析',
+      title: 'OGE | 智能地理分析',
       requiresAuth: false
     }
   },
@@ -20,7 +20,7 @@ const routes = [
     name: 'Login',
     component: () => import('@/views/Login.vue'),
     meta: {
-      title: '登录 - OGE-GA+',
+      title: '登录 - OGE',
       requiresAuth: false
     }
   },
@@ -29,7 +29,7 @@ const routes = [
     name: 'Dashboard',
     component: () => import('@/views/Dashboard.vue'),
     meta: {
-      title: '控制台 - OGE-GA+',
+      title: '控制台 - OGE',
       requiresAuth: true
     }
   },
@@ -38,7 +38,7 @@ const routes = [
     name: 'Tools',
     component: () => import('@/views/Tools.vue'),
     meta: {
-      title: 'MCP工具 - OGE-GA+',
+      title: 'MCP工具 - OGE',
       requiresAuth: false
     }
   },
@@ -47,7 +47,7 @@ const routes = [
     name: 'NotFound',
     component: () => import('@/views/NotFound.vue'),
     meta: {
-      title: '页面未找到 - OGE-GA+'
+      title: '页面未找到 - OGE'
     }
   }
 ]

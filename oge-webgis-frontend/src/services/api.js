@@ -1,8 +1,15 @@
 import axios from 'axios'
 import { ElMessage, ElNotification } from 'element-plus'
+import { deepseekService } from './deepseek'
 
 // 离线模式配置
-const OFFLINE_MODE = true // 因为无法连接内网，启用离线模式
+const OFFLINE_MODE = false // 启用在线模式，连接可用的OGE服务器
+
+// AI服务配置
+const AI_CONFIG = {
+  provider: 'deepseek', // 可选: 'deepseek', 'mcp', 'mock'
+  enableMCPTools: true   // 是否启用MCP工具调用
+}
 
 // 模拟数据
 const mockData = {
@@ -113,9 +120,9 @@ const mcpApi = createApiInstance(
   import.meta.env.DEV ? '/api/mcp' : 'http://localhost:8000'
 )
 
-// OGE服务API
+// OGE服务API - 使用可用的外网穿透服务器
 const ogeApi = createApiInstance(
-  import.meta.env.DEV ? '/api/oge' : 'http://10.101.240.20'
+  import.meta.env.DEV ? '/api/oge' : 'http://111.37.195.111:7002'
 )
 
 // =================== MCP服务接口 ===================
@@ -297,7 +304,7 @@ export const ogeService = {
 
 export const aiService = {
   // 聊天对话
-  async chat(message, sessionId = null) {
+  async chat(message, sessionId = null, conversationHistory = []) {
     if (OFFLINE_MODE) {
       return new Promise(resolve => {
         setTimeout(() => {
@@ -321,20 +328,51 @@ export const aiService = {
         }, 1000 + Math.random() * 1000) // 1-2秒随机延迟
       })
     }
-    
-    const payload = {
-      message,
-      session_id: sessionId,
-      timestamp: new Date().toISOString()
-    }
-    
+
+    // 根据配置选择AI服务提供商
     try {
-      // 优先使用MCP服务的AI接口
-      return await mcpApi.post('/ai/chat', payload)
+      switch (AI_CONFIG.provider) {
+        case 'deepseek':
+          console.log('🤖 使用DeepSeek AI服务')
+          return await deepseekService.chat(message, sessionId, conversationHistory)
+        
+        case 'mcp':
+          console.log('🔧 使用MCP AI服务')
+          const payload = {
+            message,
+            session_id: sessionId,
+            timestamp: new Date().toISOString()
+          }
+          return await mcpApi.post('/ai/chat', payload)
+        
+        default:
+          // 备用模拟回复
+          return {
+            response: '智能助手暂时不可用，请稍后重试。',
+            session_id: sessionId || `fallback-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            mode: 'fallback'
+          }
+      }
     } catch (error) {
-      console.warn('MCP AI服务不可用，尝试备用服务')
-      // 备用AI服务
-      return await ogeApi.post('/ai/chat', payload)
+      console.error('AI服务调用失败:', error)
+      
+      // 如果DeepSeek失败，尝试备用MCP服务
+      if (AI_CONFIG.provider === 'deepseek') {
+        try {
+          console.log('🔄 DeepSeek失败，尝试MCP备用服务')
+          const payload = {
+            message,
+            session_id: sessionId,
+            timestamp: new Date().toISOString()
+          }
+          return await mcpApi.post('/ai/chat', payload)
+        } catch (mcpError) {
+          console.error('MCP备用服务也失败:', mcpError)
+        }
+      }
+      
+      throw error
     }
   },
 

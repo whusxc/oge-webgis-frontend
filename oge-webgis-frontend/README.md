@@ -245,7 +245,7 @@ curl -X POST http://localhost:8000/slope_analysis \
 
 ```bash
 # 查看应用日志
-docker logs oge-gaplus-frontend
+docker logs oge-frontend
 
 # 查看Nginx访问日志
 tail -f /var/log/nginx/access.log

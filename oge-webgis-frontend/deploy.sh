@@ -112,7 +112,7 @@ deploy_nginx() {
     print_step "部署到Nginx..."
     
     # 默认Nginx路径
-    NGINX_PATH="/usr/share/nginx/html/oge-gaplus"
+    NGINX_PATH="/usr/share/nginx/html/oge"
     
     if [ ! -z "$1" ]; then
         NGINX_PATH="$1"
@@ -143,7 +143,7 @@ server {
     listen 80;
     server_name localhost;
     
-    root /usr/share/nginx/html/oge-gaplus;
+    root /usr/share/nginx/html/oge;
     index index.html;
     
     # Gzip压缩
@@ -211,11 +211,11 @@ EOF
 version: '3.8'
 
 services:
-  oge-gaplus-frontend:
+  oge-frontend:
     build: .
     ports:
       - "3000:80"
-    container_name: oge-gaplus-frontend
+    container_name: oge-frontend
     restart: unless-stopped
     networks:
       - oge-network

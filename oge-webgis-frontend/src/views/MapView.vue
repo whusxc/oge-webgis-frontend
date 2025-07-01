@@ -5,7 +5,7 @@
       <div class="navbar-left">
         <div class="logo">
           <img src="/oge-logo.svg" alt="OGE" class="logo-img">
-          <span class="logo-text">OGE-GA+</span>
+          <span class="logo-text">OGE</span>
         </div>
         
         <el-menu 
@@ -126,7 +126,7 @@
       <!-- 右侧面板（智能助手） -->
       <div class="right-panel" :class="{ 'collapsed': rightPanelCollapsed }">
         <div class="panel-header">
-          <h3 v-show="!rightPanelCollapsed">GA+智能助手</h3>
+          <h3 v-show="!rightPanelCollapsed">OGE智能助手</h3>
           <el-button 
             :icon="rightPanelCollapsed ? 'Expand' : 'Fold'"
             text

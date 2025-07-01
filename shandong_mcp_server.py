@@ -33,31 +33,38 @@ except ImportError as e:
 
 T = TypeVar("T")
 
-# ============ 配置部分 - 遥感大楼环境适配 ============
+# ============ 配置部分 - 更新为可用OGE环境 ============
 
 # 服务器配置
-MCP_SERVER_NAME = "yaogan-building-cultivated-analysis"
+MCP_SERVER_NAME = "oge-mcp-analysis-server"
 
-# API配置 - 适配遥感大楼环境
-OGE_FRONTEND_URL = "http://10.101.240.20"  # 前端地址
-OGE_BACKEND_URL = "http://10.101.240.20"   # 后端地址（通过前端代理）
-COMPUTE_CLUSTER_MASTER = "http://10.101.240.10"  # 计算集群主节点
+# 根据志威哥提供的信息更新配置
+# 楼下服务器网关16555端口穿透到111.37.195.111的7002端口
+OGE_EXTERNAL_URL = "http://111.37.195.111:7002"  # 外网穿透地址
+OGE_GATEWAY_PORT = "16555"  # 内网网关端口
+
+# API配置 - 使用可用的穿透服务器
+OGE_BACKEND_URL = OGE_EXTERNAL_URL  # 使用外网穿透地址
+OGE_FRONTEND_URL = OGE_EXTERNAL_URL  # 前端也使用同一地址
 
 # 适配后的API地址配置
 OGE_API_BASE_URL = f"{OGE_BACKEND_URL}/gateway/computation-api/process"
-INTRANET_API_BASE_URL = f"{OGE_BACKEND_URL}/api/computation/process"  # 根据新环境调整
-INTRANET_AUTH_TOKEN = "Bearer TOKEN_TO_BE_UPDATED"  # 需要根据新环境获取
+INTRANET_API_BASE_URL = f"{OGE_BACKEND_URL}/api/computation/process"
+INTRANET_AUTH_TOKEN = "Bearer TOKEN_TO_BE_UPDATED"  # 需要根据实际环境获取
 
-# DAG批处理API配置 - 使用Livy服务
-DAG_API_BASE_URL = f"{COMPUTE_CLUSTER_MASTER}:8998/api/oge-dag"  # 基于Livy端口
-LIVY_API_BASE_URL = f"{COMPUTE_CLUSTER_MASTER}:8998"  # Livy API
-DEFAULT_USER_ID = "yaogan-building-user"
-DEFAULT_USERNAME = "oge_admin"
+# 计算服务配置（如果需要的话）
+COMPUTE_CLUSTER_MASTER = OGE_BACKEND_URL  # 使用同一后端地址
+DAG_API_BASE_URL = f"{COMPUTE_CLUSTER_MASTER}/api/oge-dag"
+LIVY_API_BASE_URL = f"{COMPUTE_CLUSTER_MASTER}/livy"
 
-# MinIO存储配置
-MINIO_ENDPOINT = "http://10.101.240.23:9007"
-MINIO_ACCESS_KEY = "oge"
-MINIO_SECRET_KEY = "ypfamily608"
+# 用户配置
+DEFAULT_USER_ID = "mcp-user"
+DEFAULT_USERNAME = "admin"  # 根据实际情况调整
+
+# 移除不可用的MinIO配置，使用OGE后端存储
+# MINIO_ENDPOINT = "http://10.101.240.23:9007"  # 注释掉不可用的配置
+# MINIO_ACCESS_KEY = "oge"
+# MINIO_SECRET_KEY = "ypfamily608"
 
 # ============ 响应格式定义 ============
 
@@ -133,19 +140,19 @@ mcp = FastMCP(MCP_SERVER_NAME)
 # ============ Token管理 - 适配遥感大楼环境 ============
 
 async def refresh_intranet_token() -> tuple[bool, str]:
-    """自动刷新内网token - 适配遥感大楼环境"""
+    """自动刷新OGE环境token - 适配可用服务器"""
     global INTRANET_AUTH_TOKEN
     
     try:
-        logger.info("开始刷新遥感大楼环境token...")
+        logger.info("开始刷新OGE环境token...")
         
-        # 适配新环境的认证API
+        # 使用可用服务器的认证API
         url = f"{OGE_BACKEND_URL}/api/oauth/token"
         
         params = {
             "scopes": "web",
             "client_secret": "123456",
-            "client_id": "oge_client",
+            "client_id": "oge_client", 
             "grant_type": "password",
             "username": DEFAULT_USERNAME,
             "password": "123456"  # 根据实际环境修改
@@ -159,6 +166,8 @@ async def refresh_intranet_token() -> tuple[bool, str]:
         headers = {
             "Content-Type": "application/json"
         }
+        
+        logger.info(f"尝试连接OGE服务器: {url}")
         
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(url, params=params, json=body, headers=headers)
@@ -174,7 +183,7 @@ async def refresh_intranet_token() -> tuple[bool, str]:
                     # 更新全局token
                     INTRANET_AUTH_TOKEN = full_token
                     
-                    logger.info(f"遥感大楼Token刷新成功: {full_token[:50]}...")
+                    logger.info(f"OGE Token刷新成功: {full_token[:50]}...")
                     return True, full_token
                 else:
                     logger.error(f"Token响应格式异常: {data}")
@@ -209,7 +218,7 @@ async def call_api_with_timing(
         if headers is None:
             headers = {"Content-Type": "application/json"}
         headers["Authorization"] = INTRANET_AUTH_TOKEN
-        logger.info(f"使用遥感大楼token: {INTRANET_AUTH_TOKEN[:50]}...")
+        logger.info(f"使用OGE服务器token: {INTRANET_AUTH_TOKEN[:50]}...")
         logger.info(f"实际发送headers: {dict((k, v[:50] + '...' if k == 'Authorization' and len(v) > 50 else v) for k, v in headers.items())}")
     
     # 检查是否需要自动重试
@@ -367,7 +376,7 @@ async def check_yaogan_environment(ctx: Context = None) -> str:
             {"name": "Hadoop Web UI", "url": f"{COMPUTE_CLUSTER_MASTER}:8088", "type": "hadoop"},
             {"name": "HBase Web UI", "url": f"{COMPUTE_CLUSTER_MASTER}:16010", "type": "hbase"},
             {"name": "Livy API", "url": f"{LIVY_API_BASE_URL}/sessions", "type": "livy"},
-            {"name": "MinIO Web UI", "url": f"{MINIO_ENDPOINT}/login", "type": "minio"},
+            {"name": "MinIO Web UI", "url": f"{OGE_BACKEND_URL}/login", "type": "minio"},
         ]
         
         for service in services_to_check:
@@ -403,7 +412,7 @@ async def check_yaogan_environment(ctx: Context = None) -> str:
                 "frontend": OGE_FRONTEND_URL,
                 "compute_master": COMPUTE_CLUSTER_MASTER,
                 "livy_api": LIVY_API_BASE_URL,
-                "minio": MINIO_ENDPOINT
+                "minio": OGE_BACKEND_URL
             }
         }
         
@@ -619,7 +628,7 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
                 "frontend": OGE_FRONTEND_URL,
                 "compute_cluster": COMPUTE_CLUSTER_MASTER,
                 "livy_api": LIVY_API_BASE_URL,
-                "minio": MINIO_ENDPOINT
+                "minio": OGE_BACKEND_URL
             },
             "available_tools": [
                 "check_yaogan_environment",
@@ -635,12 +644,70 @@ def create_starlette_app(mcp_server: Server, *, debug: bool = False) -> Starlett
             ]
         })
 
+    async def handle_root(request: Request):
+        return JSONResponse({
+            "server_name": MCP_SERVER_NAME,
+            "environment": "遥感大楼",
+            "version": "2.5.0-yaogan",
+            "status": "running",
+            "description": "山东耕地流出分析MCP服务器 - 遥感大楼适配版",
+            "endpoints": {
+                "/": "服务信息",
+                "/health": "健康检查", 
+                "/info": "详细信息",
+                "/sse": "SSE连接",
+                "/messages/": "消息处理"
+            },
+            "message": "MCP服务器运行正常"
+        })
+
+    async def handle_check_environment(request: Request):
+        """处理环境检查请求"""
+        try:
+            # 直接调用环境检查功能，不使用Context
+            result = await check_yaogan_environment()
+            return JSONResponse({
+                "success": True,
+                "data": result,
+                "message": "环境检查完成"
+            })
+        except Exception as e:
+            return JSONResponse({
+                "success": False,
+                "error": str(e),
+                "message": "环境检查失败"
+            }, status_code=500)
+
+    async def handle_ai_session(request: Request):
+        """处理AI会话创建"""
+        return JSONResponse({
+            "success": True,
+            "session_id": f"session_{int(time.time())}",
+            "message": "会话创建成功"
+        })
+
+    async def handle_layers(request: Request):
+        """处理图层获取请求"""
+        return JSONResponse({
+            "success": True,
+            "data": [
+                {"id": 1, "name": "底图图层", "type": "base", "visible": True},
+                {"id": 2, "name": "卫星影像", "type": "raster", "visible": False},
+                {"id": 3, "name": "遥感大楼数据", "type": "vector", "visible": True}
+            ],
+            "message": "图层数据获取成功"
+        })
+
     return Starlette(
         debug=debug,
         routes=[
+            Route("/", endpoint=handle_root),
             Route("/sse", endpoint=handle_sse),
             Route("/health", endpoint=handle_health),
             Route("/info", endpoint=handle_info),
+            Route("/check_yaogan_environment", endpoint=handle_check_environment, methods=["GET", "POST"]),
+            Route("/ai/session", endpoint=handle_ai_session, methods=["POST"]),
+            Route("/layers", endpoint=handle_layers, methods=["GET"]),
             Mount("/messages/", app=sse.handle_post_message),
         ],
     )

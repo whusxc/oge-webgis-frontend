@@ -39,9 +39,9 @@ export const useAppStore = defineStore('app', () => {
       lastHealthCheck: null
     },
     
-    // OGE服务配置（需要内网）
+    // OGE服务配置（使用可用的外网穿透服务器）
     oge: {
-      baseUrl: import.meta.env.DEV ? '/api/oge' : 'http://10.101.240.20',
+      baseUrl: import.meta.env.DEV ? '/api/oge' : 'http://111.37.195.111:7002',
       timeout: 30000,
       connected: false,
       lastHealthCheck: null
@@ -89,7 +89,7 @@ export const useAppStore = defineStore('app', () => {
       // 初始化完成
       initialized.value = true
       
-      console.log('🎉 OGE-GA+ 应用初始化完成')
+      console.log('🎉 OGE 应用初始化完成')
     } catch (error) {
       console.error('应用初始化失败:', error)
     } finally {

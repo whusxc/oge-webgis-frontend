@@ -5,7 +5,7 @@
       <div class="header-info">
         <el-icon class="assistant-icon"><ChatDotRound /></el-icon>
         <div>
-          <h4>GA+智能助手</h4>
+          <h4>OGE智能助手</h4>
           <span class="status online">在线</span>
         </div>
       </div>
@@ -19,7 +19,7 @@
       <!-- 欢迎消息 -->
       <div v-if="messages.length === 0" class="welcome-message">
         <el-icon size="48" color="#409eff"><Robot /></el-icon>
-        <h3>您好！我是GA+智能助手</h3>
+        <h3>您好！我是OGE智能助手</h3>
         <p>我可以帮助您进行地理分析、数据查询和问题解答</p>
         
         <div class="quick-actions">
@@ -50,12 +50,28 @@
         
         <div class="message-content">
           <div class="message-header">
-            <span class="sender">{{ message.type === 'user' ? username || '用户' : 'GA+助手' }}</span>
+            <span class="sender">{{ message.type === 'user' ? username || '用户' : 'OGE助手' }}</span>
             <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
           </div>
           
           <div class="message-body">
             {{ message.content }}
+          </div>
+
+          <!-- 工具调用显示 -->
+          <div v-if="message.tool_calls && message.tool_calls.length > 0" class="tool-calls">
+            <div class="tool-header">
+              <el-icon><Tools /></el-icon>
+              <span>调用了 {{ message.tool_calls.length }} 个分析工具</span>
+            </div>
+            <div v-for="(toolCall, idx) in message.tool_calls" :key="idx" class="tool-item">
+              <div class="tool-name">
+                {{ getToolDisplayName(toolCall.function.name) }}
+              </div>
+              <div class="tool-params">
+                {{ formatToolParams(toolCall.function.arguments) }}
+              </div>
+            </div>
           </div>
           
           <!-- AI消息操作 -->
@@ -63,6 +79,10 @@
             <el-button size="small" text @click="copyMessage(message.content)">
               <el-icon><CopyDocument /></el-icon>
               复制
+            </el-button>
+            <el-button v-if="message.tool_calls" size="small" text @click="showToolDetails(message)">
+              <el-icon><View /></el-icon>
+              工具详情
             </el-button>
           </div>
         </div>
@@ -115,6 +135,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { aiService, showSuccess, showError } from '@/services/api'
 
@@ -136,7 +157,7 @@ const username = computed(() => user.username)
 const quickActions = reactive([
   { id: 'analysis', label: '地理分析', message: '我想进行地理分析，有哪些工具可以使用？' },
   { id: 'data', label: '数据查询', message: '帮我查询北京市的数据' },
-  { id: 'tutorial', label: '使用教程', message: '如何使用OGE-GA+平台？' },
+          { id: 'tutorial', label: '使用教程', message: '如何使用OGE平台？' },
   { id: 'examples', label: '示例案例', message: '给我展示一些分析案例' }
 ])
 
@@ -184,36 +205,41 @@ const sendMessage = async () => {
   isTyping.value = true
   
   try {
-    // 模拟AI响应
-    setTimeout(() => {
-      const responses = [
-        '我理解您的需求。OGE-GA+平台提供了多种地理分析工具，包括坡度分析、缓冲区分析、耕地流出分析等。',
-        '根据您的问题，我建议您使用坡度分析工具。这个工具可以帮助您分析地形的坡度信息。',
-        '北京市面积约16410平方公里，人口约2188万人。您还需要了解其他数据吗？',
-        '很高兴为您介绍OGE-GA+平台的使用方法。首先，您可以从左侧的工具面板选择分析工具...',
-        '这里有几个典型的地理分析案例：1.城市热岛效应分析 2.农业用地变化监测 3.水体污染评估'
-      ]
-      
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)]
-      
-      addMessage({
-        type: 'ai',
-        content: randomResponse,
-        timestamp: new Date().toISOString()
-      })
-      
-      isTyping.value = false
-    }, 1000 + Math.random() * 2000)
+    // 调用AI服务 (现在支持DeepSeek)
+    const response = await aiService.chat(message, sessionId.value, messages.value)
     
+    // 添加AI回复
+    addMessage({
+      type: 'ai',
+      content: response.response,
+      timestamp: response.timestamp,
+      tool_calls: response.tool_calls,
+      tool_results: response.tool_results
+    })
+    
+    isTyping.value = false
     emit('message-send', message)
     
   } catch (error) {
     console.error('AI响应失败:', error)
+    
+    let errorMessage = '抱歉，AI助手暂时无法响应，请稍后重试。'
+    
+    if (error.response?.status === 401) {
+      errorMessage = 'AI服务认证失败，请检查API密钥配置。'
+    } else if (error.response?.status === 429) {
+      errorMessage = 'AI服务请求过于频繁，请稍后重试。'
+    } else if (error.message?.includes('network')) {
+      errorMessage = '网络连接失败，请检查网络设置。'
+    }
+    
     addMessage({
       type: 'ai',
-      content: '抱歉，AI助手暂时无法响应，请稍后重试。',
-      timestamp: new Date().toISOString()
+      content: errorMessage,
+      timestamp: new Date().toISOString(),
+      error: true
     })
+    
     isTyping.value = false
   }
 }
@@ -266,6 +292,52 @@ const copyMessage = async (content) => {
 const clearChat = () => {
   messages.value = []
   showSuccess('对话已清空')
+}
+
+// 获取工具显示名称
+const getToolDisplayName = (toolName) => {
+  const toolNames = {
+    'check_yaogan_environment': '环境检查',
+    'slope_analysis': '坡度分析',
+    'buffer_analysis': '缓冲区分析',
+    'farmland_outflow': '耕地流出分析',
+    'road_extraction': '道路提取',
+    'image_classification': '影像分类'
+  }
+  return toolNames[toolName] || toolName
+}
+
+// 格式化工具参数
+const formatToolParams = (argsStr) => {
+  try {
+    const args = JSON.parse(argsStr)
+    const params = []
+    for (const [key, value] of Object.entries(args)) {
+      params.push(`${key}: ${JSON.stringify(value)}`)
+    }
+    return params.join(', ') || '无参数'
+  } catch {
+    return argsStr || '无参数'
+  }
+}
+
+// 显示工具详情
+const showToolDetails = (message) => {
+  const toolInfo = message.tool_calls?.map(tool => ({
+    name: getToolDisplayName(tool.function.name),
+    params: tool.function.arguments,
+    result: message.tool_results?.find(r => r.tool_call_id === tool.id)?.output
+  }))
+  
+  // 使用Element Plus的消息框显示详情
+  const details = toolInfo?.map(tool => 
+    `工具: ${tool.name}\n参数: ${tool.params}\n结果: ${tool.result || '执行中...'}`
+  ).join('\n\n')
+  
+  ElMessageBox.alert(details, '工具调用详情', {
+    confirmButtonText: '确定',
+    type: 'info'
+  })
 }
 </script>
 
@@ -409,9 +481,58 @@ const clearChat = () => {
       line-height: 1.6;
       word-wrap: break-word;
     }
+
+    .tool-calls {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 3px solid #409eff;
+      
+      .tool-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #409eff;
+        margin-bottom: 8px;
+      }
+      
+      .tool-item {
+        margin-bottom: 8px;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+        
+        .tool-name {
+          font-size: 13px;
+          font-weight: 500;
+          color: #303133;
+          margin-bottom: 2px;
+        }
+        
+        .tool-params {
+          font-size: 12px;
+          color: #909399;
+          font-family: monospace;
+        }
+      }
+    }
     
     .message-actions {
       margin-top: 8px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      
+      .el-button {
+        padding: 4px 8px;
+      }
+    }
+    
+    &:hover .message-actions {
+      opacity: 1;
     }
   }
   
