@@ -1,664 +1,831 @@
 <template>
-  <div class="map-view">
-    <!-- 顶部导航栏 -->
-    <div class="top-navbar">
-      <div class="navbar-left">
-        <div class="logo">
-          <img src="/oge-logo.svg" alt="OGE" class="logo-img">
-          <span class="logo-text">OGE</span>
+  <div class="modern-map-view">
+    <!-- 现代化顶部导航栏 -->
+    <header class="top-header">
+      <div class="header-left">
+        <div class="brand-section">
+          <div class="brand-logo">
+            <div class="logo-icon">🌍</div>
+            <span class="brand-name">OGE</span>
+          </div>
+          <div class="brand-tagline">智能地理分析平台</div>
         </div>
         
-        <el-menu 
-          mode="horizontal" 
-          :default-active="activeMenu"
-          class="navbar-menu"
-          @select="handleMenuSelect"
-        >
-          <el-menu-item index="map">地图分析</el-menu-item>
-          <el-menu-item index="tools">工具箱</el-menu-item>
-          <el-menu-item index="data">数据管理</el-menu-item>
-          <el-menu-item index="task">任务中心</el-menu-item>
-        </el-menu>
+        <nav class="main-navigation">
+          <button 
+            v-for="tab in navigationTabs" 
+            :key="tab.id"
+            :class="['nav-tab', { active: activeTab === tab.id }]"
+            @click="setActiveTab(tab.id)"
+          >
+            <span class="tab-icon">{{ tab.icon }}</span>
+            <span class="tab-label">{{ tab.label }}</span>
+          </button>
+        </nav>
       </div>
       
-      <div class="navbar-right">
-        <!-- 环境状态指示器 -->
-        <el-tooltip content="检查环境状态" placement="bottom">
-          <el-button 
-            :type="environmentStatus.healthy ? 'success' : 'danger'"
-            :icon="environmentStatus.healthy ? 'Check' : 'Warning'"
-            circle
-            size="small"
-            @click="checkEnvironment"
-            :loading="environmentStatus.checking"
-          />
-        </el-tooltip>
-        
-        <!-- 用户信息 -->
-        <el-dropdown v-if="user.isLoggedIn" trigger="click">
-          <span class="user-dropdown">
-            <el-avatar :size="32" :src="user.avatar">
-              {{ user.username?.charAt(0).toUpperCase() }}
-            </el-avatar>
-            <span class="username">{{ user.username }}</span>
-            <el-icon><ArrowDown /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="$router.push('/dashboard')">
-                <el-icon><User /></el-icon>
-                个人中心
-              </el-dropdown-item>
-              <el-dropdown-item @click="$router.push('/settings')">
-                <el-icon><Setting /></el-icon>
-                设置
-              </el-dropdown-item>
-              <el-dropdown-item divided @click="handleLogout">
-                <el-icon><SwitchButton /></el-icon>
-                退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        
-        <el-button v-else type="primary" @click="$router.push('/login')">
-          登录
-        </el-button>
+      <div class="header-right">
+        <div class="header-controls">
+          <!-- 系统状态 -->
+          <div class="status-indicator" :class="systemStatus.type">
+            <div class="status-dot"></div>
+            <span class="status-text">{{ systemStatus.text }}</span>
+          </div>
+          
+          <!-- 快捷操作 -->
+          <div class="quick-actions">
+            <button class="action-btn" @click="toggleFullscreen" title="全屏模式">
+              <span>⛶</span>
+            </button>
+            <button class="action-btn" @click="showSettings" title="设置">
+              <span>⚙️</span>
+            </button>
+          </div>
+          
+          <!-- 用户区域 -->
+          <div class="user-section">
+            <div class="user-avatar" @click="showUserMenu">
+              <span>{{ userInitial }}</span>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </header>
 
     <!-- 主内容区域 -->
-    <div class="main-content">
-      <!-- 左侧面板 -->
-      <div class="left-panel" :class="{ 'collapsed': leftPanelCollapsed }">
-        <div class="panel-header">
-          <h3 v-show="!leftPanelCollapsed">图层与工具</h3>
-          <el-button 
-            :icon="leftPanelCollapsed ? 'Expand' : 'Fold'"
-            text
-            @click="leftPanelCollapsed = !leftPanelCollapsed"
-          />
+    <main class="main-content">
+      <!-- 左侧工具面板 -->
+      <aside class="left-sidebar" :class="{ collapsed: leftSidebarCollapsed }">
+        <div class="sidebar-header">
+          <h3 v-show="!leftSidebarCollapsed">{{ leftPanelTitle }}</h3>
+          <button 
+            class="collapse-btn"
+            @click="toggleLeftSidebar"
+            :title="leftSidebarCollapsed ? '展开面板' : '收起面板'"
+          >
+            <span>{{ leftSidebarCollapsed ? '▶' : '◀' }}</span>
+          </button>
         </div>
         
-        <div class="panel-content" v-show="!leftPanelCollapsed">
-          <!-- 图层控制 -->
-          <LayerPanel @layer-toggle="handleLayerToggle" />
+        <div class="sidebar-content" v-show="!leftSidebarCollapsed">
+          <!-- 工具选项卡 -->
+          <div class="tool-tabs">
+            <button 
+              v-for="tool in toolTabs"
+              :key="tool.id"
+              :class="['tool-tab', { active: activeTool === tool.id }]"
+              @click="setActiveTool(tool.id)"
+            >
+              <span class="tool-icon">{{ tool.icon }}</span>
+              <span class="tool-label">{{ tool.label }}</span>
+            </button>
+          </div>
           
-          <!-- MCP工具栏 -->
-          <McpToolBar @tool-execute="handleToolExecute" />
+          <!-- 工具内容 -->
+          <div class="tool-content">
+            <component :is="currentToolComponent" />
+          </div>
         </div>
-      </div>
+      </aside>
 
       <!-- 地图容器 -->
-      <div class="map-container">
-        <div id="map" ref="mapContainer"></div>
-        
-        <!-- 地图工具栏 -->
-        <div class="map-toolbar">
-          <el-button-group>
-            <el-tooltip content="放大" placement="top">
-              <el-button :icon="'ZoomIn'" @click="zoomIn" />
-            </el-tooltip>
-            <el-tooltip content="缩小" placement="top">
-              <el-button :icon="'ZoomOut'" @click="zoomOut" />
-            </el-tooltip>
-            <el-tooltip content="适合范围" placement="top">
-              <el-button :icon="'FullScreen'" @click="fitBounds" />
-            </el-tooltip>
-            <el-tooltip content="定位" placement="top">
-              <el-button :icon="'Location'" @click="locateUser" />
-            </el-tooltip>
-          </el-button-group>
-        </div>
-        
-        <!-- 地图信息显示 -->
-        <div class="map-info">
-          <div class="coordinates">
-            经度: {{ currentCoords.lng?.toFixed(6) }} | 
-            纬度: {{ currentCoords.lat?.toFixed(6) }}
+      <section class="map-section">
+        <div class="map-container" ref="mapContainer">
+          <!-- 地图工具栏 -->
+          <div class="map-toolbar">
+            <div class="toolbar-group">
+              <button class="map-tool-btn" @click="zoomIn" title="放大">
+                <span>🔍</span>
+              </button>
+              <button class="map-tool-btn" @click="zoomOut" title="缩小">
+                <span>🔍</span>
+              </button>
+              <button class="map-tool-btn" @click="fitBounds" title="适合视图">
+                <span>⌂</span>
+              </button>
+            </div>
+            
+            <div class="toolbar-group">
+              <button class="map-tool-btn" @click="toggleMeasure" title="测量工具">
+                <span>📏</span>
+              </button>
+              <button class="map-tool-btn" @click="toggleDraw" title="绘制工具">
+                <span>✏️</span>
+              </button>
+            </div>
           </div>
-          <div class="zoom-level">
-            缩放级别: {{ currentZoom }}
+          
+          <!-- 地图信息面板 -->
+          <div class="map-info-panel">
+            <div class="coordinate-display">
+              <span class="coord-label">坐标:</span>
+              <span class="coord-value">
+                {{ currentCoords.lng?.toFixed(6) }}, {{ currentCoords.lat?.toFixed(6) }}
+              </span>
+            </div>
+            <div class="zoom-display">
+              <span class="zoom-label">缩放:</span>
+              <span class="zoom-value">{{ currentZoom }}</span>
+            </div>
+          </div>
+          
+          <!-- 地图加载状态 -->
+          <div v-if="mapLoading" class="map-loading">
+            <div class="loading-spinner"></div>
+            <p>正在加载地图...</p>
+          </div>
+          
+          <!-- 离线模式提示 -->
+          <div class="offline-notice">
+            <div class="notice-content">
+              <span class="notice-icon">📱</span>
+              <span class="notice-text">离线演示模式</span>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 右侧面板（智能助手） -->
-      <div class="right-panel" :class="{ 'collapsed': rightPanelCollapsed }">
-        <div class="panel-header">
-          <h3 v-show="!rightPanelCollapsed">OGE智能助手</h3>
-          <el-button 
-            :icon="rightPanelCollapsed ? 'Expand' : 'Fold'"
-            text
-            @click="rightPanelCollapsed = !rightPanelCollapsed"
-          />
+      <!-- 右侧AI助手面板 -->
+      <aside class="right-sidebar" :class="{ collapsed: rightSidebarCollapsed }">
+        <div class="sidebar-header">
+          <div class="ai-header" v-show="!rightSidebarCollapsed">
+            <div class="ai-avatar">🤖</div>
+            <div class="ai-info">
+              <h3>OGE智能助手</h3>
+              <p class="ai-status">{{ aiStatus }}</p>
+            </div>
+          </div>
+          <button 
+            class="collapse-btn"
+            @click="toggleRightSidebar"
+            :title="rightSidebarCollapsed ? '展开AI助手' : '收起AI助手'"
+          >
+            <span>{{ rightSidebarCollapsed ? '◀' : '▶' }}</span>
+          </button>
         </div>
         
-        <div class="panel-content" v-show="!rightPanelCollapsed">
-          <ChatBox @message-send="handleChatMessage" />
+        <div class="sidebar-content" v-show="!rightSidebarCollapsed">
+          <ChatInterface />
         </div>
-      </div>
-    </div>
-
-    <!-- 任务状态弹窗 -->
-    <el-dialog 
-      v-model="taskDialog.visible"
-      :title="taskDialog.title"
-      width="600px"
-      destroy-on-close
-    >
-      <TaskProgress 
-        v-if="taskDialog.visible"
-        :task-id="taskDialog.taskId"
-        @task-complete="handleTaskComplete"
-      />
-    </el-dialog>
+      </aside>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { mcpService, showSuccess, showError } from '@/services/api'
-import mapboxgl from 'mapbox-gl'
 
-// 导入组件
-import LayerPanel from '@/components/LayerPanel.vue'
-import McpToolBar from '@/components/McpToolBar.vue'
-import ChatBox from '@/components/ChatBox.vue'
-import TaskProgress from '@/components/TaskProgress.vue'
+// 组件导入（简化版本）
+const LayerTools = { template: '<div class="layer-tools"><h4>🗺️ 图层管理</h4><p>图层控制功能</p></div>' }
+const AnalysisTools = { template: '<div class="analysis-tools"><h4>📊 空间分析</h4><p>分析工具集合</p></div>' }
+const DataTools = { template: '<div class="data-tools"><h4>💾 数据管理</h4><p>数据导入导出</p></div>' }
+const ChatInterface = { template: '<div class="chat-interface"><div class="chat-messages"><div class="message ai-message">您好！我是OGE智能助手，很高兴为您服务！</div></div><div class="chat-input"><input placeholder="请输入您的问题..." /><button>发送</button></div></div>' }
 
 const router = useRouter()
 const appStore = useAppStore()
 
 // 响应式数据
-const mapContainer = ref(null)
-const map = ref(null)
-const activeMenu = ref('map')
-const leftPanelCollapsed = ref(false)
-const rightPanelCollapsed = ref(false)
+const leftSidebarCollapsed = ref(false)
+const rightSidebarCollapsed = ref(false)
+const activeTab = ref('map')
+const activeTool = ref('layers')
+const mapLoading = ref(false)
 
-// 环境状态
-const environmentStatus = reactive({
-  healthy: false,
-  checking: false,
-  lastCheck: null
-})
+// 导航标签页
+const navigationTabs = [
+  { id: 'map', label: '地图分析', icon: '🗺️' },
+  { id: 'tools', label: '工具箱', icon: '🛠️' },
+  { id: 'data', label: '数据中心', icon: '💾' },
+  { id: 'reports', label: '分析报告', icon: '📋' }
+]
 
-// 地图状态
-const currentCoords = reactive({
-  lng: 116.3974,
-  lat: 39.9093
-})
+// 工具标签页
+const toolTabs = [
+  { id: 'layers', label: '图层', icon: '🗂️' },
+  { id: 'analysis', label: '分析', icon: '📊' },
+  { id: 'data', label: '数据', icon: '💾' }
+]
+
+// 当前坐标和缩放
+const currentCoords = reactive({ lng: 116.3974, lat: 39.9093 })
 const currentZoom = ref(10)
 
-// 任务对话框
-const taskDialog = reactive({
-  visible: false,
-  title: '',
-  taskId: null
+// 计算属性
+const leftPanelTitle = computed(() => {
+  const tool = toolTabs.find(t => t.id === activeTool.value)
+  return tool ? `${tool.icon} ${tool.label}` : '工具面板'
 })
 
-// 用户信息
-const { user, config } = appStore
-
-// 生命周期钩子
-onMounted(async () => {
-  await nextTick()
-  initMap()
-  checkEnvironment()
-})
-
-onUnmounted(() => {
-  if (map.value) {
-    map.value.remove()
+const currentToolComponent = computed(() => {
+  switch (activeTool.value) {
+    case 'layers': return LayerTools
+    case 'analysis': return AnalysisTools
+    case 'data': return DataTools
+    default: return LayerTools
   }
 })
 
-// 初始化地图
-const initMap = () => {
-  try {
-    // 设置 Mapbox access token
-    mapboxgl.accessToken = config.mapbox.accessToken
+const systemStatus = computed(() => {
+  return appStore.config?.system?.offlineMode 
+    ? { type: 'offline', text: '离线模式' }
+    : { type: 'online', text: '在线模式' }
+})
 
-    // 创建地图实例
-    map.value = new mapboxgl.Map({
-      container: mapContainer.value,
-      style: config.mapbox.style,
-      center: config.mapbox.center,
-      zoom: config.mapbox.zoom,
-      attributionControl: false
-    })
+const aiStatus = computed(() => {
+  return appStore.config?.system?.offlineMode ? '离线演示' : '智能分析中'
+})
 
-    // 添加控件
-    map.value.addControl(new mapboxgl.NavigationControl(), 'top-right')
-    map.value.addControl(new mapboxgl.ScaleControl(), 'bottom-left')
+const userInitial = computed(() => {
+  return appStore.user?.username?.charAt(0).toUpperCase() || 'G'
+})
 
-    // 地图事件监听
-    map.value.on('load', () => {
-      console.log('🗺️ 地图加载完成')
-      showSuccess('地图初始化成功')
-    })
-
-    map.value.on('mousemove', (e) => {
-      currentCoords.lng = e.lngLat.lng
-      currentCoords.lat = e.lngLat.lat
-    })
-
-    map.value.on('zoom', () => {
-      currentZoom.value = Math.round(map.value.getZoom())
-    })
-
-    map.value.on('click', (e) => {
-      console.log('地图点击:', e.lngLat)
-      // 这里可以添加点击处理逻辑
-    })
-
-    // 右键菜单
-    map.value.on('contextmenu', (e) => {
-      e.preventDefault()
-      showContextMenu(e.lngLat)
-    })
-
-  } catch (error) {
-    console.error('地图初始化失败:', error)
-    showError('地图初始化失败，请检查网络连接')
+// 方法
+const setActiveTab = (tabId) => {
+  activeTab.value = tabId
+  if (tabId !== 'map') {
+    router.push(`/${tabId}`)
   }
 }
 
-// 检查环境状态
-const checkEnvironment = async () => {
-  environmentStatus.checking = true
-  
-  try {
-    const result = await mcpService.checkEnvironment()
-    environmentStatus.healthy = result.all_services_healthy || false
-    environmentStatus.lastCheck = new Date()
-    
-    if (environmentStatus.healthy) {
-      showSuccess('环境检查通过，所有服务运行正常')
-    } else {
-      showError('环境检查发现问题，部分服务可能不可用')
-    }
-  } catch (error) {
-    console.error('环境检查失败:', error)
-    environmentStatus.healthy = false
-    showError('环境检查失败，请检查MCP服务状态')
-  } finally {
-    environmentStatus.checking = false
-  }
+const setActiveTool = (toolId) => {
+  activeTool.value = toolId
 }
 
-// 菜单选择处理
-const handleMenuSelect = (key) => {
-  activeMenu.value = key
-  
-  switch (key) {
-    case 'map':
-      // 当前页面
-      break
-    case 'tools':
-      router.push('/tools')
-      break
-    case 'data':
-      router.push('/data')
-      break
-    case 'task':
-      router.push('/task')
-      break
-  }
+const toggleLeftSidebar = () => {
+  leftSidebarCollapsed.value = !leftSidebarCollapsed.value
 }
 
-// 图层切换处理
-const handleLayerToggle = (layerId, visible) => {
-  console.log('图层切换:', layerId, visible)
-  
-  if (map.value.getLayer(layerId)) {
-    map.value.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
-  }
+const toggleRightSidebar = () => {
+  rightSidebarCollapsed.value = !rightSidebarCollapsed.value
 }
 
-// 工具执行处理
-const handleToolExecute = async (toolName, params) => {
-  console.log('执行工具:', toolName, params)
-  
-  try {
-    let result
-    
-    switch (toolName) {
-      case 'slope_analysis':
-        result = await mcpService.slopeAnalysis(params)
-        break
-      case 'buffer_analysis':
-        result = await mcpService.bufferAnalysis(params)
-        break
-      case 'farmland_outflow':
-        result = await mcpService.farmlandOutflow(params)
-        break
-      case 'road_extraction':
-        result = await mcpService.roadExtraction(params)
-        break
-      default:
-        throw new Error(`未知工具: ${toolName}`)
-    }
-    
-    // 显示任务进度对话框
-    if (result.task_id) {
-      taskDialog.taskId = result.task_id
-      taskDialog.title = `执行${toolName}`
-      taskDialog.visible = true
-    }
-    
-    // 如果有直接结果，添加到地图
-    if (result.geojson) {
-      addResultToMap(result.geojson, toolName)
-    }
-    
-    showSuccess(`${toolName} 执行成功`)
-  } catch (error) {
-    console.error('工具执行失败:', error)
-    showError(`${toolName} 执行失败: ${error.message}`)
-  }
-}
-
-// 添加结果到地图
-const addResultToMap = (geojson, layerName) => {
-  const sourceId = `${layerName}-${Date.now()}`
-  const layerId = `${layerName}-layer-${Date.now()}`
-  
-  // 添加数据源
-  map.value.addSource(sourceId, {
-    type: 'geojson',
-    data: geojson
-  })
-  
-  // 添加图层
-  map.value.addLayer({
-    id: layerId,
-    type: 'fill',
-    source: sourceId,
-    paint: {
-      'fill-color': '#ff0000',
-      'fill-opacity': 0.5,
-      'fill-outline-color': '#000000'
-    }
-  })
-  
-  // 适配到结果范围
-  const bbox = turf.bbox(geojson)
-  map.value.fitBounds(bbox, { padding: 50 })
-  
-  // 保存图层信息
-  appStore.addLayer({
-    id: layerId,
-    name: layerName,
-    type: 'result',
-    sourceId,
-    visible: true
-  })
-}
-
-// 聊天消息处理
-const handleChatMessage = async (message) => {
-  console.log('用户消息:', message)
-  // ChatBox组件会处理AI响应
-}
-
-// 任务完成处理
-const handleTaskComplete = (taskResult) => {
-  console.log('任务完成:', taskResult)
-  
-  if (taskResult.geojson) {
-    addResultToMap(taskResult.geojson, taskResult.tool_name)
-  }
-  
-  taskDialog.visible = false
-  showSuccess('任务执行完成')
-}
-
-// 地图操作
 const zoomIn = () => {
-  map.value.zoomIn()
+  currentZoom.value = Math.min(currentZoom.value + 1, 20)
 }
 
 const zoomOut = () => {
-  map.value.zoomOut()
+  currentZoom.value = Math.max(currentZoom.value - 1, 1)
 }
 
 const fitBounds = () => {
-  map.value.fitBounds([
-    [73.66, 3.86],   // 中国西南角
-    [135.05, 53.55]  // 中国东北角
-  ])
+  console.log('适合视图')
 }
 
-const locateUser = () => {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { longitude, latitude } = position.coords
-        map.value.flyTo({
-          center: [longitude, latitude],
-          zoom: 15
-        })
-        showSuccess('定位成功')
-      },
-      (error) => {
-        console.error('定位失败:', error)
-        showError('定位失败，请检查位置权限')
-      }
-    )
+const toggleMeasure = () => {
+  console.log('测量工具')
+}
+
+const toggleDraw = () => {
+  console.log('绘制工具')
+}
+
+const toggleFullscreen = () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen()
   } else {
-    showError('浏览器不支持地理定位')
+    document.exitFullscreen()
   }
 }
 
-// 右键菜单
-const showContextMenu = (lngLat) => {
-  // 这里可以实现右键菜单功能
-  console.log('右键点击:', lngLat)
+const showSettings = () => {
+  console.log('显示设置')
 }
 
-// 退出登录
-const handleLogout = () => {
-  appStore.logout()
-  router.push('/login')
+const showUserMenu = () => {
+  console.log('显示用户菜单')
 }
+
+onMounted(() => {
+  console.log('🗺️ 现代化地图界面已加载')
+})
 </script>
 
 <style lang="scss" scoped>
-.map-view {
+.modern-map-view {
   height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: var(--surface-alt);
+  overflow: hidden;
 }
 
-.top-navbar {
-  height: 60px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+// 顶部导航栏
+.top-header {
+  height: 64px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
-  z-index: 1000;
+  justify-content: space-between;
+  padding: 0 1rem;
+  box-shadow: var(--shadow);
+  z-index: 100;
   
-  .navbar-left {
+  .header-left {
     display: flex;
     align-items: center;
+    gap: 2rem;
     
-    .logo {
+    .brand-section {
       display: flex;
       align-items: center;
-      margin-right: 30px;
+      gap: 1rem;
       
-      .logo-img {
-        width: 32px;
-        height: 32px;
-        margin-right: 8px;
+      .brand-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        
+        .logo-icon {
+          width: 32px;
+          height: 32px;
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.2rem;
+        }
+        
+        .brand-name {
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          letter-spacing: -0.02em;
+        }
       }
       
-      .logo-text {
-        font-size: 20px;
-        font-weight: bold;
-        color: #409eff;
+      .brand-tagline {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        font-weight: 500;
       }
     }
     
-    .navbar-menu {
-      border: none;
+    .main-navigation {
+      display: flex;
+      gap: 0.5rem;
       
-      :deep(.el-menu-item) {
-        border-bottom: none;
+      .nav-tab {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border: none;
+        background: transparent;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: var(--transition);
+        font-weight: 500;
+        color: var(--text-secondary);
         
         &:hover {
-          background-color: #ecf5ff;
+          background: var(--surface-alt);
+          color: var(--text-primary);
         }
         
-        &.is-active {
-          color: #409eff;
-          background-color: #ecf5ff;
+        &.active {
+          background: var(--primary);
+          color: white;
+        }
+        
+        .tab-icon {
+          font-size: 1rem;
         }
       }
     }
   }
   
-  .navbar-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    
-    .user-dropdown {
+  .header-right {
+    .header-controls {
       display: flex;
       align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 4px;
-      transition: background-color 0.3s;
+      gap: 1rem;
       
-      &:hover {
-        background-color: #f5f7fa;
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        
+        .status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+        
+        &.online {
+          background: rgba(16, 185, 129, 0.1);
+          color: var(--secondary);
+          
+          .status-dot {
+            background: var(--secondary);
+          }
+        }
+        
+        &.offline {
+          background: rgba(245, 158, 11, 0.1);
+          color: var(--accent);
+          
+          .status-dot {
+            background: var(--accent);
+          }
+        }
       }
       
-      .username {
-        font-size: 14px;
-        color: #606266;
+      .quick-actions {
+        display: flex;
+        gap: 0.25rem;
+        
+        .action-btn {
+          width: 36px;
+          height: 36px;
+          border: none;
+          background: transparent;
+          border-radius: 8px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: var(--transition);
+          
+          &:hover {
+            background: var(--surface-alt);
+          }
+        }
+      }
+      
+      .user-section {
+        .user-avatar {
+          width: 36px;
+          height: 36px;
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: 600;
+          cursor: pointer;
+          transition: var(--transition);
+          
+          &:hover {
+            transform: scale(1.05);
+          }
+        }
       }
     }
   }
 }
 
+// 主内容区域
 .main-content {
   flex: 1;
   display: flex;
-  height: calc(100vh - 60px);
-}
-
-.left-panel, .right-panel {
-  background: #fff;
-  border-right: 1px solid #e4e7ed;
-  transition: width 0.3s ease;
+  overflow: hidden;
   
-  &.collapsed {
-    width: 50px;
+  // 侧边栏通用样式
+  .left-sidebar,
+  .right-sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    transition: var(--transition);
+    overflow: hidden;
     
-    .panel-content {
-      display: none;
+    .sidebar-header {
+      height: 56px;
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      
+      h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      
+      .collapse-btn {
+        width: 24px;
+        height: 24px;
+        border: none;
+        background: var(--surface-alt);
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+        
+        &:hover {
+          background: var(--border);
+        }
+      }
+    }
+    
+    .sidebar-content {
+      height: calc(100% - 56px);
+      overflow-y: auto;
+    }
+    
+    &.collapsed {
+      width: 48px !important;
     }
   }
   
-  .panel-header {
-    height: 50px;
-    border-bottom: 1px solid #e4e7ed;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 16px;
+  .left-sidebar {
+    width: 320px;
     
-    h3 {
-      margin: 0;
-      font-size: 14px;
-      color: #303133;
+    .tool-tabs {
+      display: flex;
+      padding: 0.5rem;
+      gap: 0.25rem;
+      border-bottom: 1px solid var(--border);
+      
+      .tool-tab {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.75rem 0.5rem;
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: var(--transition);
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        
+        &:hover {
+          background: var(--surface-alt);
+        }
+        
+        &.active {
+          background: var(--primary);
+          color: white;
+        }
+        
+        .tool-icon {
+          font-size: 1.25rem;
+        }
+      }
+    }
+    
+    .tool-content {
+      padding: 1rem;
     }
   }
   
-  .panel-content {
-    height: calc(100% - 50px);
-    overflow-y: auto;
+  .right-sidebar {
+    width: 320px;
+    border-right: none;
+    border-left: 1px solid var(--border);
+    
+    .ai-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      
+      .ai-avatar {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, var(--secondary), var(--primary));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+      }
+      
+      .ai-info {
+        h3 {
+          font-size: 0.875rem;
+          margin-bottom: 0.125rem;
+        }
+        
+        .ai-status {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          margin: 0;
+        }
+      }
+    }
   }
 }
 
-.left-panel {
-  width: 320px;
-}
-
-.right-panel {
-  width: 400px;
-  border-right: none;
-  border-left: 1px solid #e4e7ed;
-}
-
-.map-container {
+// 地图区域
+.map-section {
   flex: 1;
   position: relative;
   
-  #map {
+  .map-container {
     width: 100%;
     height: 100%;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    &::before {
+      content: '🗺️';
+      font-size: 4rem;
+      opacity: 0.3;
+    }
   }
   
   .map-toolbar {
     position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 100;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 10;
+    
+    .toolbar-group {
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 0.25rem;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      
+      .map-tool-btn {
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+        
+        &:hover {
+          background: var(--surface-alt);
+        }
+      }
+    }
   }
   
-  .map-info {
+  .map-info-panel {
     position: absolute;
-    bottom: 20px;
-    left: 20px;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    color: #606266;
-    backdrop-filter: blur(8px);
+    bottom: 1rem;
+    left: 1rem;
+    background: var(--surface);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
     
-    .coordinates, .zoom-level {
-      margin: 2px 0;
+    .coord-label,
+    .zoom-label {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    
+    .coord-value,
+    .zoom-value {
+      color: var(--text-primary);
+      font-family: 'Monaco', monospace;
+    }
+  }
+  
+  .offline-notice {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 10;
+    
+    .notice-content {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+  }
+  
+  .map-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-secondary);
+    
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top: 3px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
     }
   }
 }
 
-// 响应式设计
-@media (max-width: 1200px) {
-  .left-panel {
-    width: 280px;
+// 工具组件样式
+:deep(.layer-tools),
+:deep(.analysis-tools),
+:deep(.data-tools) {
+  h4 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    font-weight: 600;
   }
   
-  .right-panel {
-    width: 350px;
+  p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
   }
 }
 
-@media (max-width: 768px) {
-  .left-panel, .right-panel {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    z-index: 200;
+// AI聊天界面
+:deep(.chat-interface) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  
+  .chat-messages {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
     
-    &.collapsed {
-      transform: translateX(-100%);
+    .message {
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      border-radius: 12px;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      
+      &.ai-message {
+        background: var(--surface-alt);
+        color: var(--text-primary);
+      }
     }
   }
   
-  .navbar-menu {
-    display: none;
+  .chat-input {
+    padding: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 0.5rem;
+    
+    input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      outline: none;
+      
+      &:focus {
+        border-color: var(--primary);
+      }
+    }
+    
+    button {
+      padding: 0.5rem 1rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      
+      &:hover {
+        background: var(--primary-dark);
+      }
+    }
   }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style> 

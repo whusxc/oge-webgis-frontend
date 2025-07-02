@@ -3,7 +3,7 @@ import { ElMessage, ElNotification } from 'element-plus'
 import { deepseekService } from './deepseek'
 
 // 离线模式配置
-const OFFLINE_MODE = false // 启用在线模式，连接可用的OGE服务器
+const OFFLINE_MODE = true // 启用离线模式，适合非内网环境
 
 // AI服务配置
 const AI_CONFIG = {
@@ -589,5 +589,6 @@ export default {
   downloadFile,
   showSuccess,
   showError,
-  showInfo
+  showInfo,
+  showWarning
 } 

@@ -78,13 +78,18 @@ export const useAppStore = defineStore('app', () => {
   // 初始化应用
   const initApp = async () => {
     try {
+      console.log('📱 开始初始化应用状态...')
       setLoading(true)
       
       // 检查用户登录状态
+      console.log('🔐 检查认证状态...')
       await checkAuthStatus()
       
-      // 加载应用配置
-      await loadAppConfig()
+      // 设置默认配置（不调用可能失败的API）
+      console.log('⚙️ 加载应用配置...')
+      config.system.offlineMode = true
+      config.system.networkStatus = 'offline'
+      config.system.lastConnectAttempt = new Date()
       
       // 初始化完成
       initialized.value = true
@@ -92,6 +97,7 @@ export const useAppStore = defineStore('app', () => {
       console.log('🎉 OGE 应用初始化完成')
     } catch (error) {
       console.error('应用初始化失败:', error)
+      throw error // 重新抛出错误让上层处理
     } finally {
       setLoading(false)
     }
